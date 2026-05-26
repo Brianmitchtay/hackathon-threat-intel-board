@@ -9,6 +9,11 @@
 <body>
 <nav>
   <a class="logo" href="/">⚡ Threat Intel Board</a>
+  <div class="live-indicator">
+    <span class="live-dot"></span>
+    <span class="live-text">LIVE</span>
+    <span class="last-update" id="last-update">Just now</span>
+  </div>
 </nav>
 <main>
   <div class="hero-section">
@@ -37,7 +42,7 @@
   <div class="two-column-layout">
     <div class="priority-threats-section">
       <h2 class="section-title">⚠️ Aging Threats</h2>
-      <p class="section-subtitle">Requires immediate attention</p>
+      <p class="section-subtitle">Critical/High severity threats waiting > 3 days</p>
       <div class="priority-panel" id="priority-threats">
         <p class="empty">Loading…</p>
       </div>
@@ -50,6 +55,10 @@
     </div>
   </div>
 </main>
+
+<!-- Toast Notification Container -->
+<div class="toast-container" id="toast-container"></div>
+
 <script>
 // Helper function to calculate days since creation
 function getDaysOpen(createdAt) {
@@ -68,7 +77,109 @@ function getPriorityScore(ticket) {
   return severityScore * 1000 - daysOpen;
 }
 
-fetch('/api/teams')
+// Helper function to update "last updated" timestamp
+function updateLastUpdateTime() {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+  document.getElementById('last-update').textContent = timeStr;
+}
+
+// Toast notification system
+let toastCount = 0;
+
+function showToast(message, severity, duration = 5000) {
+  const container = document.getElementById('toast-container');
+  const toastId = `toast-${toastCount++}`;
+
+  const severityConfig = {
+    critical: { icon: '🔴', color: '#ff7b72', bg: '#3d1a1a' },
+    high: { icon: '🟠', color: '#ffa657', bg: '#3d2a1a' },
+    medium: { icon: '🟡', color: '#e3b341', bg: '#3d3a1a' },
+    low: { icon: '🟢', color: '#3fb950', bg: '#1a3d2a' }
+  };
+
+  const config = severityConfig[severity] || severityConfig.medium;
+
+  const toast = document.createElement('div');
+  toast.id = toastId;
+  toast.className = 'toast';
+  toast.style.borderLeftColor = config.color;
+  toast.style.background = config.bg;
+  toast.innerHTML = `
+    <div class="toast-icon">${config.icon}</div>
+    <div class="toast-content">
+      <div class="toast-title">${severity.toUpperCase()} Priority Alert</div>
+      <div class="toast-message">${message}</div>
+    </div>
+    <button class="toast-close" onclick="removeToast('${toastId}')">&times;</button>
+  `;
+
+  container.appendChild(toast);
+
+  // Trigger animation
+  setTimeout(() => toast.classList.add('show'), 10);
+
+  // Auto-remove after duration
+  setTimeout(() => removeToast(toastId), duration);
+}
+
+function removeToast(toastId) {
+  const toast = document.getElementById(toastId);
+  if (toast) {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }
+}
+
+function showThreatToasts(agingThreats) {
+  if (agingThreats.length === 0) return;
+
+  // Group threats by severity
+  const criticalThreats = agingThreats.filter(t => t.severity === 'critical');
+  const highThreats = agingThreats.filter(t => t.severity === 'high');
+  const mediumThreats = agingThreats.filter(t => t.severity === 'medium');
+
+  let delay = 5000; // Start showing toasts after 5 seconds
+
+  // Show critical threats first
+  if (criticalThreats.length > 0) {
+    setTimeout(() => {
+      showToast(
+        `${criticalThreats.length} critical threat${criticalThreats.length > 1 ? 's' : ''} waiting over 3 days! Immediate action required.`,
+        'critical',
+        8000
+      );
+    }, delay);
+    delay += 3000;
+  }
+
+  // Then high priority
+  if (highThreats.length > 0) {
+    setTimeout(() => {
+      showToast(
+        `${highThreats.length} high priority threat${highThreats.length > 1 ? 's' : ''} aging in queue. Review recommended.`,
+        'high',
+        7000
+      );
+    }, delay);
+    delay += 3000;
+  }
+
+  // Finally medium (if any)
+  if (mediumThreats.length > 0) {
+    setTimeout(() => {
+      showToast(
+        `${mediumThreats.length} medium priority threat${mediumThreats.length > 1 ? 's' : ''} require attention.`,
+        'medium',
+        6000
+      );
+    }, delay);
+  }
+}
+
+// Main data loading function
+function loadDashboardData(isInitialLoad = false) {
+  fetch('/api/teams')
   .then(r => r.json())
   .then(teams => {
     const el = document.getElementById('cards');
@@ -92,16 +203,28 @@ fetch('/api/teams')
         document.getElementById('resolved-threats').textContent = resolvedThreats;
         document.getElementById('critical-threats').textContent = criticalCount;
 
-        // Filter open tickets and sort by priority
+        // Filter open tickets: only critical/high severity AND older than 3 days
         const openTickets = tickets.filter(t => t.status !== 'resolved');
         const agingThreats = openTickets
           .map(t => ({ ...t, daysOpen: getDaysOpen(t.created_at), priorityScore: getPriorityScore(t) }))
+          .filter(t => {
+            // Only show critical or high severity
+            const isUrgentSeverity = t.severity === 'critical' || t.severity === 'high';
+            // Only show if waiting more than 3 days
+            const isAging = t.daysOpen > 3;
+            return isUrgentSeverity && isAging;
+          })
           .sort((a, b) => a.priorityScore - b.priorityScore)
           .slice(0, 10); // Show top 10
 
+        // Show toast notifications on initial load after delay
+        if (isInitialLoad && agingThreats.length > 0) {
+          showThreatToasts(agingThreats);
+        }
+
         const priorityEl = document.getElementById('priority-threats');
         if (agingThreats.length === 0) {
-          priorityEl.innerHTML = '<p class="empty">No open threats. All clear!</p>';
+          priorityEl.innerHTML = '<p class="empty">🎉 No urgent aging threats! All critical/high severity threats are being handled promptly.</p>';
         } else {
           priorityEl.innerHTML = `
             <div class="priority-list">
@@ -162,7 +285,30 @@ fetch('/api/teams')
         </div>
       </a>`;
     }).join('');
+
+    // Update the last update timestamp
+    updateLastUpdateTime();
   });
+}
+
+// Initial load with alert
+loadDashboardData(true);
+
+// Auto-refresh every 30 seconds for live updates (without alert)
+setInterval(() => {
+  loadDashboardData(false);
+}, 30000);
+
+// Pulse animation for live indicator
+setInterval(() => {
+  const liveDot = document.querySelector('.live-dot');
+  if (liveDot) {
+    liveDot.style.animation = 'none';
+    setTimeout(() => {
+      liveDot.style.animation = 'pulse 2s ease-in-out infinite';
+    }, 10);
+  }
+}, 30000);
 </script>
 </body>
 </html>
