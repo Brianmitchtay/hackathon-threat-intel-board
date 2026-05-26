@@ -11,24 +11,157 @@
   <a class="logo" href="/">⚡ Threat Intel Board</a>
 </nav>
 <main>
-  <h1>Teams</h1>
-  <p class="subtitle">Select a team to view their threat intelligence tickets.</p>
-  <div class="cards" id="cards"><p class="empty">Loading…</p></div>
+  <div class="hero-section">
+    <h1>Security Threat Intelligence Dashboard</h1>
+    <p class="subtitle">Real-time monitoring and management of cybersecurity threats across all teams</p>
+    <div class="stats-summary" id="stats-summary">
+      <div class="stat-card">
+        <div class="stat-value" id="total-threats">—</div>
+        <div class="stat-label">Total Threats</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value critical" id="open-threats">—</div>
+        <div class="stat-label">Open Threats</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value success" id="resolved-threats">—</div>
+        <div class="stat-label">Resolved</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value warning" id="critical-threats">—</div>
+        <div class="stat-label">Critical Priority</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-column-layout">
+    <div class="priority-threats-section">
+      <h2 class="section-title">⚠️ Aging Threats</h2>
+      <p class="section-subtitle">Requires immediate attention</p>
+      <div class="priority-panel" id="priority-threats">
+        <p class="empty">Loading…</p>
+      </div>
+    </div>
+
+    <div class="teams-section">
+      <h2 class="section-title">Teams Overview</h2>
+      <p class="section-subtitle">Select a team to manage tickets</p>
+      <div class="cards" id="cards"><p class="empty">Loading…</p></div>
+    </div>
+  </div>
 </main>
 <script>
+// Helper function to calculate days since creation
+function getDaysOpen(createdAt) {
+  const created = new Date(createdAt);
+  const now = new Date();
+  const diffTime = Math.abs(now - created);
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays;
+}
+
+// Helper function to calculate priority score (lower is more urgent)
+function getPriorityScore(ticket) {
+  const severityScore = { critical: 0, high: 1, medium: 2, low: 3 }[ticket.severity] || 4;
+  const daysOpen = getDaysOpen(ticket.created_at);
+  // Priority = severity weight * 1000 - days open (so older tickets rank higher within same severity)
+  return severityScore * 1000 - daysOpen;
+}
+
 fetch('/api/teams')
   .then(r => r.json())
   .then(teams => {
     const el = document.getElementById('cards');
-    el.innerHTML = teams.map(t => `
-      <a class="card" href="team.html?team=${t.id}">
-        <h3>${t.name}</h3>
-        <p>${t.description}</p>
-        <div class="counts">
-          <span>Open: <strong>${t.open}</strong></span>
-          <span>Total: <strong>${t.total}</strong></span>
+
+    // Calculate statistics
+    let totalThreats = 0;
+    let openThreats = 0;
+    teams.forEach(t => {
+      totalThreats += t.total;
+      openThreats += t.open;
+    });
+    const resolvedThreats = totalThreats - openThreats;
+
+    // Fetch all tickets to count critical ones and show aging threats
+    fetch('/api/tickets')
+      .then(r => r.json())
+      .then(tickets => {
+        const criticalCount = tickets.filter(t => t.severity === 'critical' && t.status !== 'resolved').length;
+        document.getElementById('total-threats').textContent = totalThreats;
+        document.getElementById('open-threats').textContent = openThreats;
+        document.getElementById('resolved-threats').textContent = resolvedThreats;
+        document.getElementById('critical-threats').textContent = criticalCount;
+
+        // Filter open tickets and sort by priority
+        const openTickets = tickets.filter(t => t.status !== 'resolved');
+        const agingThreats = openTickets
+          .map(t => ({ ...t, daysOpen: getDaysOpen(t.created_at), priorityScore: getPriorityScore(t) }))
+          .sort((a, b) => a.priorityScore - b.priorityScore)
+          .slice(0, 10); // Show top 10
+
+        const priorityEl = document.getElementById('priority-threats');
+        if (agingThreats.length === 0) {
+          priorityEl.innerHTML = '<p class="empty">No open threats. All clear!</p>';
+        } else {
+          priorityEl.innerHTML = `
+            <div class="priority-list">
+              ${agingThreats.map((t, idx) => `
+                <div class="priority-item" onclick="location.href='ticket.html?id=${t.threat_id}'">
+                  <div class="priority-rank">#${idx + 1}</div>
+                  <div class="priority-content">
+                    <div class="priority-header">
+                      <span class="badge badge-${t.severity}">${t.severity}</span>
+                      <span class="priority-age">${t.daysOpen} day${t.daysOpen !== 1 ? 's' : ''} open</span>
+                    </div>
+                    <div class="priority-title">${t.title}</div>
+                    <div class="priority-meta">
+                      <span>${t.asset_category_display || t.team_id}</span>
+                      <span class="status status-${t.status}">${t.status.replace('_', ' ')}</span>
+                      ${t.comments?.length ? `<span class="priority-comments">💬 ${t.comments.length}</span>` : ''}
+                    </div>
+                  </div>
+                </div>
+              `).join('')}
+            </div>
+          `;
+        }
+      });
+
+    el.innerHTML = teams.map(t => {
+      const resolvedCount = t.total - t.open;
+      const completionRate = t.total > 0 ? Math.round((resolvedCount / t.total) * 100) : 0;
+      return `
+      <a class="card enhanced" href="team.html?team=${t.id}">
+        <div class="card-header">
+          <h3>${t.name}</h3>
+          <span class="team-badge">${t.id.replace(/_/g, ' ')}</span>
         </div>
-      </a>`).join('');
+        <p class="card-description">${t.description}</p>
+        <div class="progress-section">
+          <div class="progress-label">
+            <span>Completion Rate</span>
+            <span class="progress-percent">${completionRate}%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill" style="width: ${completionRate}%"></div>
+          </div>
+        </div>
+        <div class="counts-grid">
+          <div class="count-item">
+            <span class="count-label">Open</span>
+            <span class="count-value open-count">${t.open}</span>
+          </div>
+          <div class="count-item">
+            <span class="count-label">Resolved</span>
+            <span class="count-value resolved-count">${resolvedCount}</span>
+          </div>
+          <div class="count-item">
+            <span class="count-label">Total</span>
+            <span class="count-value total-count">${t.total}</span>
+          </div>
+        </div>
+      </a>`;
+    }).join('');
   });
 </script>
 </body>

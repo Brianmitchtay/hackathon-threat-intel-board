@@ -19,7 +19,7 @@ node server.js
 - Set `REGION` and `ACCOUNT` below to match your AWS environment
 
 ```bash
-REGION=ap-southeast-2
+REGION=us-east-1
 ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
 REPO=threat-intel-board
 ```

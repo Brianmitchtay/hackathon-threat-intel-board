@@ -50,7 +50,7 @@ function render() {
 
   el.innerHTML = `<table>
     <thead><tr>
-      <th>Severity</th><th>Title</th><th>CVEs</th><th>Status</th><th>Assessed</th>
+      <th>Severity</th><th>Title</th><th>CVEs</th><th>Status</th><th>Comments</th><th>Assessed</th>
     </tr></thead>
     <tbody>${filtered.map(t => `
       <tr onclick="location.href='ticket.html?id=${t.threat_id}'">
@@ -58,6 +58,9 @@ function render() {
         <td class="title-cell">${t.title}<small>${t.asset_category_display || ''}</small></td>
         <td style="font-size:.8rem;color:#8b949e">${(t.cve_ids||[]).join(', ') || '—'}</td>
         <td><span class="status status-${t.status}">${t.status.replace('_',' ')}</span></td>
+        <td style="text-align:center">
+          <span class="comment-count">${t.comments?.length || 0}</span>
+        </td>
         <td style="font-size:.8rem;color:#8b949e;white-space:nowrap">${t.assessed_at ? new Date(t.assessed_at).toLocaleDateString() : '—'}</td>
       </tr>`).join('')}
     </tbody></table>`;

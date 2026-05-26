@@ -55,6 +55,32 @@ function render(t) {
               : '<p style="color:#8b949e;font-size:.875rem">No comments yet.</p>'}
           </div>
         </div>
+
+        <div class="panel">
+          <h3>Update Ticket</h3>
+          <form class="edit-form" id="edit-form">
+            <label>Status</label>
+            <select name="status">
+              <option value="open"        ${t.status==='open'        ?'selected':''}>Open</option>
+              <option value="in_progress" ${t.status==='in_progress' ?'selected':''}>In Progress</option>
+              <option value="resolved"    ${t.status==='resolved'    ?'selected':''}>Resolved</option>
+            </select>
+            <label>Severity</label>
+            <select name="severity">
+              <option value="critical" ${t.severity==='critical'?'selected':''}>Critical</option>
+              <option value="high"     ${t.severity==='high'    ?'selected':''}>High</option>
+              <option value="medium"   ${t.severity==='medium'  ?'selected':''}>Medium</option>
+              <option value="low"      ${t.severity==='low'     ?'selected':''}>Low</option>
+            </select>
+            <label>Add Comment</label>
+            <textarea name="comment" placeholder="Add a note…"></textarea>
+            <div class="btn-group">
+              <button type="submit" class="btn btn-primary">Save Changes</button>
+              ${t.mark_processed_url_hint ? `<button type="button" class="btn btn-secondary" id="mark-btn">Mark Processed ↗</button>` : ''}
+            </div>
+            <p id="save-msg" style="font-size:.8rem;margin-top:8px;color:#3fb950;display:none">Saved.</p>
+          </form>
+        </div>
       </div>
 
       <div>
@@ -82,32 +108,6 @@ function render(t) {
           <h3>Affected Assets</h3>
           <ul>${t.affected_assets.map(a => `<li>${a}</li>`).join('')}</ul>
         </div>` : ''}
-
-        <div class="panel">
-          <h3>Update Ticket</h3>
-          <form class="edit-form" id="edit-form">
-            <label>Status</label>
-            <select name="status">
-              <option value="open"        ${t.status==='open'        ?'selected':''}>Open</option>
-              <option value="in_progress" ${t.status==='in_progress' ?'selected':''}>In Progress</option>
-              <option value="resolved"    ${t.status==='resolved'    ?'selected':''}>Resolved</option>
-            </select>
-            <label>Severity</label>
-            <select name="severity">
-              <option value="critical" ${t.severity==='critical'?'selected':''}>Critical</option>
-              <option value="high"     ${t.severity==='high'    ?'selected':''}>High</option>
-              <option value="medium"   ${t.severity==='medium'  ?'selected':''}>Medium</option>
-              <option value="low"      ${t.severity==='low'     ?'selected':''}>Low</option>
-            </select>
-            <label>Add Comment</label>
-            <textarea name="comment" placeholder="Add a note…"></textarea>
-            <div class="btn-group">
-              <button type="submit" class="btn btn-primary">Save Changes</button>
-              ${t.mark_processed_url_hint ? `<button type="button" class="btn btn-secondary" id="mark-btn">Mark Processed ↗</button>` : ''}
-            </div>
-            <p id="save-msg" style="font-size:.8rem;margin-top:8px;color:#3fb950;display:none">Saved.</p>
-          </form>
-        </div>
       </div>
     </div>`;
 
