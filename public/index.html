@@ -8,6 +8,7 @@
 </head>
 <body>
 <nav>
+  <a href="pipeline.html" style="text-decoration:none;font-size:.875rem">Dashboard</a>
   <a class="logo" href="/">⚡ Threat Intel Board</a>
   <div class="live-indicator">
     <span class="live-dot"></span>
@@ -17,7 +18,7 @@
 </nav>
 <main>
   <div class="hero-section">
-    <h1>Security Threat Intelligence Dashboard</h1>
+    <h1>Threat Intelligence Dashboard</h1>
     <p class="subtitle">Real-time monitoring and management of cybersecurity threats across all teams</p>
     <div class="stats-summary" id="stats-summary">
       <div class="stat-card">
@@ -26,23 +27,27 @@
       </div>
       <div class="stat-card">
         <div class="stat-value critical" id="open-threats">—</div>
-        <div class="stat-label">Open Threats</div>
+        <div class="stat-label">Open</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value warning" id="in-progress-threats">—</div>
+        <div class="stat-label">In Progress</div>
       </div>
       <div class="stat-card">
         <div class="stat-value success" id="resolved-threats">—</div>
         <div class="stat-label">Resolved</div>
       </div>
       <div class="stat-card">
-        <div class="stat-value warning" id="critical-threats">—</div>
-        <div class="stat-label">Critical Priority</div>
+        <div class="stat-value critical" id="critical-threats">—</div>
+        <div class="stat-label">Critical</div>
       </div>
     </div>
   </div>
 
   <div class="two-column-layout">
     <div class="priority-threats-section">
-      <h2 class="section-title">⚠️ Aging Threats</h2>
-      <p class="section-subtitle">Critical/High severity threats waiting > 3 days</p>
+      <h2 class="section-title">⚠️ Priority Queue</h2>
+      <p class="section-subtitle">Critical/High severity threats still to be actioned</p>
       <div class="priority-panel" id="priority-threats">
         <p class="empty">Loading…</p>
       </div>
@@ -69,14 +74,6 @@ function getDaysOpen(createdAt) {
   return diffDays;
 }
 
-// Helper function to calculate priority score (lower is more urgent)
-function getPriorityScore(ticket) {
-  const severityScore = { critical: 0, high: 1, medium: 2, low: 3 }[ticket.severity] || 4;
-  const daysOpen = getDaysOpen(ticket.created_at);
-  // Priority = severity weight * 1000 - days open (so older tickets rank higher within same severity)
-  return severityScore * 1000 - daysOpen;
-}
-
 // Helper function to update "last updated" timestamp
 function updateLastUpdateTime() {
   const now = new Date();
@@ -86,6 +83,35 @@ function updateLastUpdateTime() {
 
 // Toast notification system
 let toastCount = 0;
+
+function getVisibleToasts() {
+  return document.querySelectorAll('.toast-container .toast');
+}
+
+function updateStackState() {
+  const container = document.getElementById('toast-container');
+  const toasts = getVisibleToasts();
+  if (toasts.length > 5 && !container.classList.contains('expanded')) {
+    container.classList.add('stacked');
+    let badge = container.querySelector('.stack-badge');
+    if (!badge) {
+      badge = document.createElement('div');
+      badge.className = 'stack-badge';
+      badge.onclick = () => {
+        container.classList.remove('stacked');
+        container.classList.add('expanded');
+        badge.style.display = 'none';
+      };
+      container.appendChild(badge);
+    }
+    badge.textContent = `${toasts.length} notifications — click to expand`;
+    badge.style.display = 'flex';
+  } else if (toasts.length <= 5) {
+    container.classList.remove('stacked', 'expanded');
+    const badge = container.querySelector('.stack-badge');
+    if (badge) badge.style.display = 'none';
+  }
+}
 
 function showToast(message, severity, duration = 5000) {
   const container = document.getElementById('toast-container');
@@ -114,12 +140,11 @@ function showToast(message, severity, duration = 5000) {
     <button class="toast-close" onclick="removeToast('${toastId}')">&times;</button>
   `;
 
-  container.appendChild(toast);
+  container.insertBefore(toast, container.firstChild);
 
-  // Trigger animation
   setTimeout(() => toast.classList.add('show'), 10);
+  updateStackState();
 
-  // Auto-remove after duration
   setTimeout(() => removeToast(toastId), duration);
 }
 
@@ -127,58 +152,48 @@ function removeToast(toastId) {
   const toast = document.getElementById(toastId);
   if (toast) {
     toast.classList.remove('show');
-    setTimeout(() => toast.remove(), 300);
+    setTimeout(() => {
+      toast.remove();
+      updateStackState();
+    }, 300);
   }
 }
 
-function showThreatToasts(agingThreats) {
-  if (agingThreats.length === 0) return;
+// Real-time new threat detection via polling
+let knownTicketIds = new Set();
+let initialLoadComplete = false;
 
-  // Group threats by severity
-  const criticalThreats = agingThreats.filter(t => t.severity === 'critical');
-  const highThreats = agingThreats.filter(t => t.severity === 'high');
-  const mediumThreats = agingThreats.filter(t => t.severity === 'medium');
+function pollForNewThreats() {
+  fetch('/api/tickets')
+    .then(r => r.json())
+    .then(tickets => {
+      if (!initialLoadComplete) {
+        tickets.forEach(t => knownTicketIds.add(t.threat_id));
+        initialLoadComplete = true;
+        return;
+      }
 
-  let delay = 5000; // Start showing toasts after 5 seconds
+      const newThreats = tickets.filter(t => !knownTicketIds.has(t.threat_id));
+      newThreats.forEach(t => {
+        knownTicketIds.add(t.threat_id);
+        showToast(
+          `New threat: ${t.title}`,
+          t.severity,
+          8000
+        );
+      });
 
-  // Show critical threats first
-  if (criticalThreats.length > 0) {
-    setTimeout(() => {
-      showToast(
-        `${criticalThreats.length} critical threat${criticalThreats.length > 1 ? 's' : ''} waiting over 3 days! Immediate action required.`,
-        'critical',
-        8000
-      );
-    }, delay);
-    delay += 3000;
-  }
-
-  // Then high priority
-  if (highThreats.length > 0) {
-    setTimeout(() => {
-      showToast(
-        `${highThreats.length} high priority threat${highThreats.length > 1 ? 's' : ''} aging in queue. Review recommended.`,
-        'high',
-        7000
-      );
-    }, delay);
-    delay += 3000;
-  }
-
-  // Finally medium (if any)
-  if (mediumThreats.length > 0) {
-    setTimeout(() => {
-      showToast(
-        `${mediumThreats.length} medium priority threat${mediumThreats.length > 1 ? 's' : ''} require attention.`,
-        'medium',
-        6000
-      );
-    }, delay);
-  }
+      if (newThreats.length > 0) {
+        loadDashboardData();
+      }
+    });
 }
+
+pollForNewThreats();
+setInterval(pollForNewThreats, 1000);
 
 // Main data loading function
-function loadDashboardData(isInitialLoad = false) {
+function loadDashboardData() {
   fetch('/api/teams')
   .then(r => r.json())
   .then(teams => {
@@ -187,11 +202,13 @@ function loadDashboardData(isInitialLoad = false) {
     // Calculate statistics
     let totalThreats = 0;
     let openThreats = 0;
+    let inProgressThreats = 0;
     teams.forEach(t => {
       totalThreats += t.total;
       openThreats += t.open;
+      inProgressThreats += t.in_progress;
     });
-    const resolvedThreats = totalThreats - openThreats;
+    const resolvedThreats = totalThreats - openThreats - inProgressThreats;
 
     // Fetch all tickets to count critical ones and show aging threats
     fetch('/api/tickets')
@@ -200,31 +217,26 @@ function loadDashboardData(isInitialLoad = false) {
         const criticalCount = tickets.filter(t => t.severity === 'critical' && t.status !== 'resolved').length;
         document.getElementById('total-threats').textContent = totalThreats;
         document.getElementById('open-threats').textContent = openThreats;
+        document.getElementById('in-progress-threats').textContent = inProgressThreats;
         document.getElementById('resolved-threats').textContent = resolvedThreats;
         document.getElementById('critical-threats').textContent = criticalCount;
 
         // Filter open tickets: only critical/high severity AND older than 3 days
         const openTickets = tickets.filter(t => t.status !== 'resolved');
+        const severityRank = { critical: 0, high: 1 };
         const agingThreats = openTickets
-          .map(t => ({ ...t, daysOpen: getDaysOpen(t.created_at), priorityScore: getPriorityScore(t) }))
-          .filter(t => {
-            // Only show critical or high severity
-            const isUrgentSeverity = t.severity === 'critical' || t.severity === 'high';
-            // Only show if waiting more than 3 days
-            const isAging = t.daysOpen > 3;
-            return isUrgentSeverity && isAging;
+          .map(t => ({ ...t, daysOpen: getDaysOpen(t.created_at) }))
+          .filter(t => (t.severity === 'critical' || t.severity === 'high') && t.daysOpen > 3)
+          .sort((a, b) => {
+            const sevDiff = severityRank[a.severity] - severityRank[b.severity];
+            if (sevDiff !== 0) return sevDiff;
+            return b.daysOpen - a.daysOpen;
           })
-          .sort((a, b) => a.priorityScore - b.priorityScore)
-          .slice(0, 10); // Show top 10
-
-        // Show toast notifications on initial load after delay
-        if (isInitialLoad && agingThreats.length > 0) {
-          showThreatToasts(agingThreats);
-        }
+          .slice(0, 10);
 
         const priorityEl = document.getElementById('priority-threats');
         if (agingThreats.length === 0) {
-          priorityEl.innerHTML = '<p class="empty">🎉 No urgent aging threats! All critical/high severity threats are being handled promptly.</p>';
+          priorityEl.innerHTML = '<p class="empty">🎉 No escalations! All critical/high severity threats are being actioned promptly.</p>';
         } else {
           priorityEl.innerHTML = `
             <div class="priority-list">
@@ -251,22 +263,22 @@ function loadDashboardData(isInitialLoad = false) {
       });
 
     el.innerHTML = teams.map(t => {
-      const resolvedCount = t.total - t.open;
-      const completionRate = t.total > 0 ? Math.round((resolvedCount / t.total) * 100) : 0;
+      const resolvedCount = t.total - t.open - t.in_progress;
+      const throughput = t.incoming_this_week > 0 ? Math.round((t.resolved_this_week / t.incoming_this_week) * 100) : (t.resolved_this_week > 0 ? 100 : 0);
+      const throughputClass = throughput >= 80 ? 'good' : throughput >= 50 ? 'moderate' : 'behind';
       return `
       <a class="card enhanced" href="team.html?team=${t.id}">
         <div class="card-header">
           <h3>${t.name}</h3>
-          <span class="team-badge">${t.id.replace(/_/g, ' ')}</span>
         </div>
         <p class="card-description">${t.description}</p>
         <div class="progress-section">
           <div class="progress-label">
-            <span>Completion Rate</span>
-            <span class="progress-percent">${completionRate}%</span>
+            <span>Throughput (7d)</span>
+            <span class="progress-percent ${throughputClass}">${t.resolved_this_week}/${t.incoming_this_week}</span>
           </div>
           <div class="progress-bar">
-            <div class="progress-fill" style="width: ${completionRate}%"></div>
+            <div class="progress-fill ${throughputClass}" style="width: ${Math.min(throughput, 100)}%"></div>
           </div>
         </div>
         <div class="counts-grid">
@@ -275,12 +287,12 @@ function loadDashboardData(isInitialLoad = false) {
             <span class="count-value open-count">${t.open}</span>
           </div>
           <div class="count-item">
-            <span class="count-label">Resolved</span>
-            <span class="count-value resolved-count">${resolvedCount}</span>
+            <span class="count-label">In Progress</span>
+            <span class="count-value in-progress-count">${t.in_progress}</span>
           </div>
           <div class="count-item">
-            <span class="count-label">Total</span>
-            <span class="count-value total-count">${t.total}</span>
+            <span class="count-label">Resolved</span>
+            <span class="count-value resolved-count">${resolvedCount}</span>
           </div>
         </div>
       </a>`;
@@ -291,13 +303,11 @@ function loadDashboardData(isInitialLoad = false) {
   });
 }
 
-// Initial load with alert
-loadDashboardData(true);
+// Initial load
+loadDashboardData();
 
-// Auto-refresh every 30 seconds for live updates (without alert)
-setInterval(() => {
-  loadDashboardData(false);
-}, 30000);
+// Auto-refresh every 30 seconds for live updates
+setInterval(loadDashboardData, 30000);
 
 // Pulse animation for live indicator
 setInterval(() => {

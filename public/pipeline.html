@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cyber Team Dashboard — Threat Intel Board</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .pipeline-static-item {
+      cursor: default !important;
+    }
+    .pipeline-static-item:hover {
+      background: inherit !important;
+      transform: none !important;
+    }
+    .misclass-matrix { display: flex; flex-direction: column; gap: 12px; }
+    .misclass-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; background: #161b22; border: 1px solid #30363d;
+      border-radius: 8px; border-left: 3px solid #ffa657;
+    }
+    .misclass-arrow { color: #ffa657; font-weight: 700; font-size: 1.1rem; }
+    .misclass-count {
+      margin-left: auto; background: #3d2a1a; color: #ffa657;
+      padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; font-weight: 600;
+    }
+    .misclass-teams { display: flex; align-items: center; gap: 8px; flex: 1; }
+    .misclass-team { font-size: 0.875rem; color: #e6edf3; }
+  </style>
+</head>
+<body>
+<nav>
+  <a href="pipeline.html" style="color:#58a6ff;text-decoration:none;font-size:.875rem">Dashboard</a>
+  <a class="logo" href="/">⚡ Threat Intel Board</a>
+</nav>
+<main>
+  <div class="hero-section">
+    <h1>Cyber Team Dashboard</h1>
+    <p class="subtitle">End-to-end visibility of the threat intelligence classification pipeline</p>
+    <div class="stats-summary" id="pipeline-stats">
+      <div class="stat-card">
+        <div class="stat-value" id="p-total">—</div>
+        <div class="stat-label">Total Processed</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value warning" id="p-reassigned">—</div>
+        <div class="stat-label">Reassigned</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-value success" id="p-accuracy">—</div>
+        <div class="stat-label">Classification Accuracy</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:24px;margin-top:24px">
+    <div>
+      <h2 class="section-title">Classification Breakdown</h2>
+      <p class="section-subtitle">Threats per team</p>
+      <div class="priority-panel" id="classification-breakdown">
+        <p class="empty">Loading...</p>
+      </div>
+    </div>
+
+    <div>
+      <h2 class="section-title">Severity Distribution</h2>
+      <p class="section-subtitle">AI-assigned severity</p>
+      <div class="priority-panel" id="severity-breakdown">
+        <p class="empty">Loading...</p>
+      </div>
+    </div>
+
+    <div>
+      <h2 class="section-title">Most Targeted Assets</h2>
+      <p class="section-subtitle">By report frequency</p>
+      <div class="priority-panel" id="targeted-assets" style="max-height:320px;overflow-y:auto">
+        <p class="empty">Loading...</p>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top:32px">
+    <h2 class="section-title">Misclassification Patterns</h2>
+    <p class="section-subtitle">Where the AI classifier is routing threats incorrectly, based on analyst reassignments</p>
+    <div id="misclass-panel"><p class="empty">Loading...</p></div>
+  </div>
+
+  <div style="margin-top:32px">
+    <h2 class="section-title">Recent Pipeline Activity</h2>
+    <p class="section-subtitle">Latest threats processed by the AI classification pipeline</p>
+    <div id="pipeline-table"><p class="empty">Loading...</p></div>
+  </div>
+</main>
+<script>
+const teamNames = {
+  apps_engineering: 'Apps & Engineering',
+  infrastructure: 'Infrastructure',
+  network_operations: 'Network Operations Center',
+  scada: 'SCADA',
+  service_desk: 'Service Desk'
+};
+
+function timeAgo(iso) {
+  if (!iso) return '—';
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+async function loadPipelineData() {
+  const res = await fetch('/api/pipeline/threats');
+  if (!res.ok) {
+    document.getElementById('pipeline-table').innerHTML = '<p class="empty">Unable to connect to pipeline database. Ensure DynamoDB access is configured.</p>';
+    return;
+  }
+  const threats = await res.json();
+
+  // Stats
+  const total = threats.length;
+  const reassigned = threats.filter(t => t.reassigned_to).length;
+  const accuracy = total > 0 ? Math.round(((total - reassigned) / total) * 100) : 0;
+
+  document.getElementById('p-total').textContent = total;
+  document.getElementById('p-reassigned').textContent = reassigned;
+  document.getElementById('p-accuracy').textContent = `${accuracy}%`;
+
+  // Classification breakdown
+  const byTeam = {};
+  threats.forEach(t => {
+    const team = t.asset_category || 'unknown';
+    byTeam[team] = (byTeam[team] || 0) + 1;
+  });
+  const breakdownEl = document.getElementById('classification-breakdown');
+  breakdownEl.innerHTML = `<div class="priority-list">
+    ${Object.entries(byTeam).sort((a, b) => b[1] - a[1]).map(([team, count]) => `
+      <div class="priority-item pipeline-static-item">
+        <div class="priority-content" style="padding:12px 0">
+          <div class="priority-header">
+            <span style="color:#e6edf3;font-weight:600">${teamNames[team] || team}</span>
+            <span class="priority-age">${count} threat${count !== 1 ? 's' : ''}</span>
+          </div>
+          <div class="progress-bar" style="margin-top:8px">
+            <div class="progress-fill good" style="width:${Math.round(count/total*100)}%"></div>
+          </div>
+        </div>
+      </div>
+    `).join('')}
+  </div>`;
+
+  // Severity breakdown
+  const bySeverity = { critical: 0, high: 0, medium: 0, low: 0 };
+  threats.forEach(t => { if (bySeverity[t.severity] !== undefined) bySeverity[t.severity]++; });
+  const sevEl = document.getElementById('severity-breakdown');
+  sevEl.innerHTML = `<div class="priority-list">
+    ${Object.entries(bySeverity).map(([sev, count]) => `
+      <div class="priority-item pipeline-static-item">
+        <div class="priority-content" style="padding:12px 0">
+          <div class="priority-header">
+            <span class="badge badge-${sev}">${sev}</span>
+            <span class="priority-age">${count} threat${count !== 1 ? 's' : ''} (${total > 0 ? Math.round(count/total*100) : 0}%)</span>
+          </div>
+          <div class="progress-bar" style="margin-top:8px">
+            <div class="progress-fill ${sev === 'critical' ? 'behind' : sev === 'high' ? 'moderate' : 'good'}" style="width:${total > 0 ? Math.round(count/total*100) : 0}%"></div>
+          </div>
+        </div>
+      </div>
+    `).join('')}
+  </div>`;
+
+  // Misclassification patterns
+  const misclassPatterns = {};
+  threats.filter(t => t.reassigned_from && t.reassigned_to).forEach(t => {
+    const key = `${t.reassigned_from}|${t.reassigned_to}`;
+    misclassPatterns[key] = (misclassPatterns[key] || 0) + 1;
+  });
+  const misclassEl = document.getElementById('misclass-panel');
+  const patterns = Object.entries(misclassPatterns).sort((a, b) => b[1] - a[1]);
+  if (patterns.length === 0) {
+    misclassEl.innerHTML = '<p class="empty">No reassignment data yet. As analysts reclassify threats, patterns will appear here.</p>';
+  } else {
+    misclassEl.innerHTML = `<div class="misclass-matrix">
+      ${patterns.map(([key, count]) => {
+        const [from, to] = key.split('|');
+        return `
+          <div class="misclass-row">
+            <div class="misclass-teams">
+              <span class="misclass-team">${teamNames[from] || from}</span>
+              <span class="misclass-arrow">→</span>
+              <span class="misclass-team">${teamNames[to] || to}</span>
+            </div>
+            <span class="misclass-count">${count} reassignment${count !== 1 ? 's' : ''}</span>
+          </div>`;
+      }).join('')}
+    </div>`;
+  }
+
+  // Most targeted assets
+  const assetCounts = {};
+  threats.forEach(t => {
+    (t.affected_assets || []).forEach(a => {
+      assetCounts[a] = (assetCounts[a] || 0) + 1;
+    });
+  });
+  const topAssets = Object.entries(assetCounts).sort((a, b) => b[1] - a[1]).slice(0, 20);
+  const assetsEl = document.getElementById('targeted-assets');
+  if (topAssets.length === 0) {
+    assetsEl.innerHTML = '<p class="empty">No asset data available.</p>';
+  } else {
+    assetsEl.innerHTML = `<div style="display:flex;flex-direction:column;gap:2px">
+      ${topAssets.map(([asset, count]) => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 12px;border-radius:4px">
+          <span style="color:#c9d1d9;font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">${asset}</span>
+          <span style="color:#8b949e;font-size:.75rem;margin-left:8px;white-space:nowrap">${count}</span>
+        </div>
+      `).join('')}
+    </div>`;
+  }
+
+  // Table (no confidence column)
+  const sorted = threats.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)).slice(0, 25);
+  document.getElementById('pipeline-table').innerHTML = `<table>
+    <thead><tr>
+      <th>Severity</th><th>Title</th><th>Classified As</th><th>Status</th><th>Processed</th>
+    </tr></thead>
+    <tbody>${sorted.map(t => `
+      <tr>
+        <td><span class="badge badge-${t.severity}">${t.severity}</span></td>
+        <td class="title-cell">${t.title || '—'}<small>${(t.cve_ids || []).join(', ') || ''}</small></td>
+        <td style="font-size:.85rem">${teamNames[t.asset_category] || t.asset_category || '—'}${t.reassigned_to ? `<br><small style="color:#ffa657">→ ${teamNames[t.reassigned_to] || t.reassigned_to}</small>` : ''}</td>
+        <td><span class="status status-${t.status === 'notified' ? 'open' : t.status}">${t.status || '—'}</span></td>
+        <td style="font-size:.8rem;color:#8b949e;white-space:nowrap">${timeAgo(t.created_at)}</td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+loadPipelineData();
+setInterval(loadPipelineData, 30000);
+</script>
+</body>
+</html>

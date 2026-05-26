@@ -8,8 +8,8 @@
 </head>
 <body>
 <nav>
+  <a href="pipeline.html" style="text-decoration:none;font-size:.875rem">Dashboard</a>
   <a class="logo" href="/">⚡ Threat Intel Board</a>
-  <a href="/">All Teams</a>
 </nav>
 <main>
   <a class="back" href="/">← All Teams</a>
@@ -36,6 +36,18 @@ const params = new URLSearchParams(location.search);
 const teamId = params.get('team');
 let allTickets = [];
 
+function getTimeAgo(isoDate) {
+  if (!isoDate) return '—';
+  const diff = Date.now() - new Date(isoDate).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 function sevOrder(s) { return { critical: 0, high: 1, medium: 2, low: 3 }[s] ?? 4; }
 
 function render() {
@@ -50,9 +62,12 @@ function render() {
 
   el.innerHTML = `<table>
     <thead><tr>
-      <th>Severity</th><th>Title</th><th>CVEs</th><th>Status</th><th>Comments</th><th>Assessed</th>
+      <th>Severity</th><th>Title</th><th>CVEs</th><th>Status</th><th>Comments</th><th>Last Action</th>
     </tr></thead>
-    <tbody>${filtered.map(t => `
+    <tbody>${filtered.map(t => {
+      const lastAction = t.updated_at || t.created_at;
+      const timeAgo = getTimeAgo(lastAction);
+      return `
       <tr onclick="location.href='ticket.html?id=${t.threat_id}'">
         <td><span class="badge badge-${t.severity}">${t.severity}</span></td>
         <td class="title-cell">${t.title}<small>${t.asset_category_display || ''}</small></td>
@@ -61,8 +76,9 @@ function render() {
         <td style="text-align:center">
           <span class="comment-count">${t.comments?.length || 0}</span>
         </td>
-        <td style="font-size:.8rem;color:#8b949e;white-space:nowrap">${t.assessed_at ? new Date(t.assessed_at).toLocaleDateString() : '—'}</td>
-      </tr>`).join('')}
+        <td style="font-size:.8rem;color:#8b949e;white-space:nowrap">${timeAgo}</td>
+      </tr>`;
+    }).join('')}
     </tbody></table>`;
 }
 

@@ -9,7 +9,14 @@
       "Bash(aws ecs describe-task-definition *)",
       "Bash(aws ecs register-task-definition *)",
       "Bash(aws elbv2 describe-target-groups *)",
-      "Bash(aws elbv2 modify-target-group *)"
+      "Bash(aws elbv2 modify-target-group *)",
+      "Bash(xargs -r docker stop)",
+      "Bash(docker run *)",
+      "Bash(aws iam list-roles *)",
+      "Bash(aws iam create-role *)",
+      "Bash(aws iam put-role-policy *)",
+      "Bash(npm install *)",
+      "Bash(docker buildx build *)"
     ]
   }
 }

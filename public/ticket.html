@@ -8,8 +8,8 @@
 </head>
 <body>
 <nav>
+  <a href="pipeline.html" style="text-decoration:none;font-size:.875rem">Dashboard</a>
   <a class="logo" href="/">⚡ Threat Intel Board</a>
-  <a href="/">All Teams</a>
 </nav>
 <main>
   <a class="back" id="back-link" href="/">← Back</a>
@@ -76,7 +76,6 @@ function render(t) {
             <textarea name="comment" placeholder="Add a note…"></textarea>
             <div class="btn-group">
               <button type="submit" class="btn btn-primary">Save Changes</button>
-              ${t.mark_processed_url_hint ? `<button type="button" class="btn btn-secondary" id="mark-btn">Mark Processed ↗</button>` : ''}
             </div>
             <p id="save-msg" style="font-size:.8rem;margin-top:8px;color:#3fb950;display:none">Saved.</p>
           </form>
@@ -86,9 +85,19 @@ function render(t) {
       <div>
         <div class="panel">
           <h3>Details</h3>
-          <div class="field-row"><span class="label">Team</span><span class="value">${t.asset_category_display || t.team_id}</span></div>
-          <div class="field-row"><span class="label">Assessed</span><span class="value">${fmt(t.assessed_at)}</span></div>
+          <div class="field-row">
+            <span class="label">Team</span>
+            <span class="value team-reassign" id="team-trigger">${t.asset_category_display || t.team_id} <span style="font-size:.7rem;color:#58a6ff">✎</span></span>
+            <div class="context-menu" id="team-menu">
+              <div class="context-menu-item" data-team="apps_engineering">Apps & Engineering</div>
+              <div class="context-menu-item" data-team="infrastructure">Infrastructure</div>
+              <div class="context-menu-item" data-team="network_operations">Network Operations Center</div>
+              <div class="context-menu-item" data-team="scada">SCADA</div>
+              <div class="context-menu-item" data-team="service_desk">Service Desk</div>
+            </div>
+          </div>
           <div class="field-row"><span class="label">Created</span><span class="value">${fmt(t.created_at)}</span></div>
+          <div class="field-row"><span class="label">Last Updated</span><span class="value">${fmt(t.updated_at || t.created_at)}</span></div>
           ${t.stix_id ? `<div class="field-row"><span class="label">STIX ID</span><span class="value" style="font-size:.78rem">${t.stix_id}</span></div>` : ''}
         </div>
 
@@ -118,21 +127,31 @@ function render(t) {
     render(updated);
   });
 
-  const markBtn = document.getElementById('mark-btn');
-  if (markBtn) {
-    markBtn.addEventListener('click', async () => {
-      // hint is "POST /threats/{id}/processed" — we just show a confirmation for the demo
-      // since the pipeline URL isn't known at runtime without config
-      markBtn.textContent = '✓ Marked Processed';
-      markBtn.disabled = true;
-      // also set status to resolved locally
-      await fetch(`/api/update-ticket/${id}`, {
+  const teamTrigger = document.getElementById('team-trigger');
+  const teamMenu = document.getElementById('team-menu');
+  teamTrigger.addEventListener('click', (e) => {
+    e.stopPropagation();
+    teamMenu.classList.toggle('visible');
+  });
+  teamMenu.querySelectorAll('.context-menu-item').forEach(item => {
+    item.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const newTeam = item.dataset.team;
+      const originalTeam = t.team_id;
+      teamMenu.classList.remove('visible');
+      const res = await fetch(`/api/update-ticket/${id}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'resolved', comment: 'Marked as processed.' })
+        body: JSON.stringify({ team_id: newTeam, comment: `Reassigned to ${item.textContent}.` })
       });
-      load();
+      // Send feedback to pipeline DynamoDB
+      fetch(`/api/pipeline/feedback/${id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_team: newTeam, original_team: originalTeam })
+      });
+      render(await res.json());
     });
-  }
+  });
+  document.addEventListener('click', () => teamMenu.classList.remove('visible'));
 }
 
 async function load() {
