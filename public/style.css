@@ -1,0 +1,182 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #0d1117;
+  color: #c9d1d9;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── nav ── */
+nav {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  padding: 0 24px;
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+nav .logo { font-weight: 700; font-size: 1rem; color: #58a6ff; text-decoration: none; }
+nav a { color: #8b949e; text-decoration: none; font-size: .875rem; }
+nav a:hover { color: #c9d1d9; }
+
+/* ── main ── */
+main { flex: 1; padding: 32px 24px; max-width: 1100px; width: 100%; margin: 0 auto; }
+
+h1 { font-size: 1.4rem; font-weight: 600; color: #e6edf3; margin-bottom: 8px; }
+h2 { font-size: 1.1rem; font-weight: 600; color: #e6edf3; margin-bottom: 16px; }
+.subtitle { color: #8b949e; font-size: .875rem; margin-bottom: 28px; }
+
+/* ── team cards ── */
+.cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+.card {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 20px;
+  cursor: pointer;
+  transition: border-color .15s;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+.card:hover { border-color: #58a6ff; }
+.card h3 { font-size: .95rem; font-weight: 600; color: #e6edf3; margin-bottom: 6px; }
+.card p  { font-size: .8rem; color: #8b949e; margin-bottom: 14px; line-height: 1.4; }
+.card .counts { display: flex; gap: 12px; font-size: .8rem; }
+.card .counts span { color: #8b949e; }
+.card .counts strong { color: #e6edf3; }
+
+/* ── severity badges ── */
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.badge-critical { background: #3d1a1a; color: #ff7b72; border: 1px solid #ff7b72; }
+.badge-high     { background: #3d2a1a; color: #ffa657; border: 1px solid #ffa657; }
+.badge-medium   { background: #3d3a1a; color: #e3b341; border: 1px solid #e3b341; }
+.badge-low      { background: #1a3d2a; color: #3fb950; border: 1px solid #3fb950; }
+
+/* ── status badges ── */
+.status {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: .75rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+.status-open        { background: #1f3a5f; color: #58a6ff; }
+.status-in_progress { background: #3d2a1a; color: #ffa657; }
+.status-resolved    { background: #1a3d2a; color: #3fb950; }
+
+/* ── filters ── */
+.filters { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center; }
+.filters select, .filters input {
+  background: #161b22;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: .875rem;
+}
+.filters select:focus, .filters input:focus { outline: none; border-color: #58a6ff; }
+.back { color: #58a6ff; text-decoration: none; font-size: .875rem; display: inline-flex; align-items: center; gap: 4px; margin-bottom: 20px; }
+.back:hover { text-decoration: underline; }
+
+/* ── ticket table ── */
+table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+thead th {
+  text-align: left;
+  padding: 10px 12px;
+  color: #8b949e;
+  font-weight: 500;
+  border-bottom: 1px solid #30363d;
+  font-size: .8rem;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+tbody tr { border-bottom: 1px solid #21262d; cursor: pointer; transition: background .1s; }
+tbody tr:hover { background: #161b22; }
+tbody td { padding: 12px; vertical-align: middle; }
+tbody td.title-cell { color: #e6edf3; font-weight: 500; max-width: 340px; }
+tbody td.title-cell small { display: block; color: #8b949e; font-weight: 400; font-size: .78rem; margin-top: 2px; }
+
+/* ── ticket detail ── */
+.ticket-header { margin-bottom: 24px; }
+.ticket-header h1 { font-size: 1.3rem; margin-bottom: 10px; }
+.ticket-meta { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 8px; }
+.ticket-body { display: grid; grid-template-columns: 1fr 300px; gap: 24px; }
+@media (max-width: 700px) { .ticket-body { grid-template-columns: 1fr; } }
+
+.panel {
+  background: #161b22;
+  border: 1px solid #30363d;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 16px;
+}
+.panel h3 { font-size: .85rem; font-weight: 600; color: #8b949e; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 12px; }
+.panel p, .panel li { font-size: .875rem; line-height: 1.6; color: #c9d1d9; }
+.panel ul { padding-left: 18px; }
+
+.field-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid #21262d; font-size: .875rem; }
+.field-row:last-child { border-bottom: none; }
+.field-row .label { color: #8b949e; }
+.field-row .value { color: #e6edf3; text-align: right; }
+
+/* ── edit form ── */
+.edit-form label { display: block; font-size: .8rem; color: #8b949e; margin-bottom: 4px; margin-top: 12px; }
+.edit-form select, .edit-form textarea {
+  width: 100%;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  color: #c9d1d9;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: .875rem;
+  font-family: inherit;
+}
+.edit-form select:focus, .edit-form textarea:focus { outline: none; border-color: #58a6ff; }
+.edit-form textarea { resize: vertical; min-height: 72px; }
+
+/* ── buttons ── */
+.btn {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: .875rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: opacity .15s;
+}
+.btn:hover { opacity: .85; }
+.btn-primary { background: #238636; color: #fff; }
+.btn-secondary { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; }
+.btn-danger { background: #da3633; color: #fff; }
+.btn-group { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+
+/* ── comments ── */
+.comment { padding: 10px 0; border-bottom: 1px solid #21262d; }
+.comment:last-child { border-bottom: none; }
+.comment .meta { font-size: .78rem; color: #8b949e; margin-bottom: 4px; }
+.comment .text { font-size: .875rem; color: #c9d1d9; }
+
+/* ── confidence bar ── */
+.conf-bar { height: 6px; background: #21262d; border-radius: 3px; margin-top: 4px; }
+.conf-fill { height: 100%; border-radius: 3px; background: #58a6ff; }
+
+.empty { color: #8b949e; font-size: .875rem; padding: 32px 0; text-align: center; }

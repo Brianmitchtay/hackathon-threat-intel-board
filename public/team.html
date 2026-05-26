@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tickets — Threat Intel Board</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <a class="logo" href="/">⚡ Threat Intel Board</a>
+  <a href="/">All Teams</a>
+</nav>
+<main>
+  <a class="back" href="/">← All Teams</a>
+  <h1 id="team-name">Loading…</h1>
+  <div class="filters">
+    <select id="f-severity">
+      <option value="">All Severities</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+    </select>
+    <select id="f-status">
+      <option value="">All Statuses</option>
+      <option value="open">Open</option>
+      <option value="in_progress">In Progress</option>
+      <option value="resolved">Resolved</option>
+    </select>
+  </div>
+  <div id="content"><p class="empty">Loading…</p></div>
+</main>
+<script>
+const params = new URLSearchParams(location.search);
+const teamId = params.get('team');
+let allTickets = [];
+
+function sevOrder(s) { return { critical: 0, high: 1, medium: 2, low: 3 }[s] ?? 4; }
+
+function render() {
+  const sev = document.getElementById('f-severity').value;
+  const st  = document.getElementById('f-status').value;
+  const filtered = allTickets
+    .filter(t => (!sev || t.severity === sev) && (!st || t.status === st))
+    .sort((a, b) => sevOrder(a.severity) - sevOrder(b.severity));
+
+  const el = document.getElementById('content');
+  if (!filtered.length) { el.innerHTML = '<p class="empty">No tickets match the current filters.</p>'; return; }
+
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th>Severity</th><th>Title</th><th>CVEs</th><th>Status</th><th>Assessed</th>
+    </tr></thead>
+    <tbody>${filtered.map(t => `
+      <tr onclick="location.href='ticket.html?id=${t.threat_id}'">
+        <td><span class="badge badge-${t.severity}">${t.severity}</span></td>
+        <td class="title-cell">${t.title}<small>${t.asset_category_display || ''}</small></td>
+        <td style="font-size:.8rem;color:#8b949e">${(t.cve_ids||[]).join(', ') || '—'}</td>
+        <td><span class="status status-${t.status}">${t.status.replace('_',' ')}</span></td>
+        <td style="font-size:.8rem;color:#8b949e;white-space:nowrap">${t.assessed_at ? new Date(t.assessed_at).toLocaleDateString() : '—'}</td>
+      </tr>`).join('')}
+    </tbody></table>`;
+}
+
+async function load() {
+  const [teamsRes, ticketsRes] = await Promise.all([
+    fetch('/api/teams'),
+    fetch(`/api/tickets?team=${teamId}`)
+  ]);
+  const teams = await teamsRes.json();
+  allTickets  = await ticketsRes.json();
+  const team  = teams.find(t => t.id === teamId);
+  document.getElementById('team-name').textContent = team ? team.name : teamId;
+  document.title = `${team?.name || teamId} — Threat Intel Board`;
+  render();
+}
+
+document.getElementById('f-severity').addEventListener('change', render);
+document.getElementById('f-status').addEventListener('change', render);
+load();
+</script>
+</body>
+</html>

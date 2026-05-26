@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Threat Intel Board</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <a class="logo" href="/">⚡ Threat Intel Board</a>
+</nav>
+<main>
+  <h1>Teams</h1>
+  <p class="subtitle">Select a team to view their threat intelligence tickets.</p>
+  <div class="cards" id="cards"><p class="empty">Loading…</p></div>
+</main>
+<script>
+fetch('/api/teams')
+  .then(r => r.json())
+  .then(teams => {
+    const el = document.getElementById('cards');
+    el.innerHTML = teams.map(t => `
+      <a class="card" href="team.html?team=${t.id}">
+        <h3>${t.name}</h3>
+        <p>${t.description}</p>
+        <div class="counts">
+          <span>Open: <strong>${t.open}</strong></span>
+          <span>Total: <strong>${t.total}</strong></span>
+        </div>
+      </a>`).join('');
+  });
+</script>
+</body>
+</html>

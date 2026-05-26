@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ticket — Threat Intel Board</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav>
+  <a class="logo" href="/">⚡ Threat Intel Board</a>
+  <a href="/">All Teams</a>
+</nav>
+<main>
+  <a class="back" id="back-link" href="/">← Back</a>
+  <div id="content"><p class="empty">Loading…</p></div>
+</main>
+<script>
+const id = new URLSearchParams(location.search).get('id');
+
+function fmt(iso) { return iso ? new Date(iso).toLocaleString() : '—'; }
+function confPct(c) { return c != null ? Math.round(c * 100) : null; }
+
+function render(t) {
+  document.title = `${t.title} — Threat Intel Board`;
+  document.getElementById('back-link').href = `team.html?team=${t.team_id}`;
+
+  const pct = confPct(t.confidence);
+  document.getElementById('content').innerHTML = `
+    <div class="ticket-header">
+      <h1>${t.title}</h1>
+      <div class="ticket-meta">
+        <span class="badge badge-${t.severity}" id="sev-badge">${t.severity}</span>
+        <span class="status status-${t.status}" id="status-badge">${t.status.replace('_',' ')}</span>
+        <span style="font-size:.8rem;color:#8b949e">${t.threat_id}</span>
+      </div>
+    </div>
+
+    <div class="ticket-body">
+      <div>
+        <div class="panel">
+          <h3>Summary</h3>
+          <p>${t.summary || 'No summary provided.'}</p>
+        </div>
+
+        <div class="panel">
+          <h3>Comments (${t.comments.length})</h3>
+          <div id="comments-list">
+            ${t.comments.length
+              ? t.comments.map(c => `
+                  <div class="comment">
+                    <div class="meta">${fmt(c.at)}</div>
+                    <div class="text">${c.text}</div>
+                  </div>`).join('')
+              : '<p style="color:#8b949e;font-size:.875rem">No comments yet.</p>'}
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="panel">
+          <h3>Details</h3>
+          <div class="field-row"><span class="label">Team</span><span class="value">${t.asset_category_display || t.team_id}</span></div>
+          <div class="field-row"><span class="label">Assessed</span><span class="value">${fmt(t.assessed_at)}</span></div>
+          <div class="field-row"><span class="label">Created</span><span class="value">${fmt(t.created_at)}</span></div>
+          ${t.stix_id ? `<div class="field-row"><span class="label">STIX ID</span><span class="value" style="font-size:.78rem">${t.stix_id}</span></div>` : ''}
+          ${pct != null ? `
+          <div class="field-row" style="flex-direction:column;gap:4px">
+            <span class="label">AI Confidence: ${pct}%</span>
+            <div class="conf-bar"><div class="conf-fill" style="width:${pct}%"></div></div>
+          </div>` : ''}
+        </div>
+
+        ${t.cve_ids?.length ? `
+        <div class="panel">
+          <h3>CVEs</h3>
+          <ul>${t.cve_ids.map(c => `<li><a href="https://nvd.nist.gov/vuln/detail/${c}" target="_blank" style="color:#58a6ff">${c}</a></li>`).join('')}</ul>
+        </div>` : ''}
+
+        ${t.affected_assets?.length ? `
+        <div class="panel">
+          <h3>Affected Assets</h3>
+          <ul>${t.affected_assets.map(a => `<li>${a}</li>`).join('')}</ul>
+        </div>` : ''}
+
+        <div class="panel">
+          <h3>Update Ticket</h3>
+          <form class="edit-form" id="edit-form">
+            <label>Status</label>
+            <select name="status">
+              <option value="open"        ${t.status==='open'        ?'selected':''}>Open</option>
+              <option value="in_progress" ${t.status==='in_progress' ?'selected':''}>In Progress</option>
+              <option value="resolved"    ${t.status==='resolved'    ?'selected':''}>Resolved</option>
+            </select>
+            <label>Severity</label>
+            <select name="severity">
+              <option value="critical" ${t.severity==='critical'?'selected':''}>Critical</option>
+              <option value="high"     ${t.severity==='high'    ?'selected':''}>High</option>
+              <option value="medium"   ${t.severity==='medium'  ?'selected':''}>Medium</option>
+              <option value="low"      ${t.severity==='low'     ?'selected':''}>Low</option>
+            </select>
+            <label>Add Comment</label>
+            <textarea name="comment" placeholder="Add a note…"></textarea>
+            <div class="btn-group">
+              <button type="submit" class="btn btn-primary">Save Changes</button>
+              ${t.mark_processed_url_hint ? `<button type="button" class="btn btn-secondary" id="mark-btn">Mark Processed ↗</button>` : ''}
+            </div>
+            <p id="save-msg" style="font-size:.8rem;margin-top:8px;color:#3fb950;display:none">Saved.</p>
+          </form>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('edit-form').addEventListener('submit', async e => {
+    e.preventDefault();
+    const fd = new FormData(e.target);
+    const body = { status: fd.get('status'), severity: fd.get('severity') };
+    if (fd.get('comment').trim()) body.comment = fd.get('comment').trim();
+    const res = await fetch(`/api/update-ticket/${id}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    });
+    const updated = await res.json();
+    render(updated);
+  });
+
+  const markBtn = document.getElementById('mark-btn');
+  if (markBtn) {
+    markBtn.addEventListener('click', async () => {
+      // hint is "POST /threats/{id}/processed" — we just show a confirmation for the demo
+      // since the pipeline URL isn't known at runtime without config
+      markBtn.textContent = '✓ Marked Processed';
+      markBtn.disabled = true;
+      // also set status to resolved locally
+      await fetch(`/api/update-ticket/${id}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'resolved', comment: 'Marked as processed.' })
+      });
+      load();
+    });
+  }
+}
+
+async function load() {
+  const res = await fetch(`/api/ticket/${id}`);
+  if (!res.ok) { document.getElementById('content').innerHTML = '<p class="empty">Ticket not found.</p>'; return; }
+  render(await res.json());
+}
+
+load();
+</script>
+</body>
+</html>
