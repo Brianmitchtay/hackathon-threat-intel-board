@@ -14,6 +14,7 @@ node server.js
 ## Deploy to AWS ECS (Fargate)
 
 ### Prerequisites
+
 - AWS CLI v2 configured (`aws configure`)
 - Docker running
 - Set `REGION` and `ACCOUNT` below to match your AWS environment
@@ -69,7 +70,10 @@ Create a file `task-def.json`:
       "image": "<ACCOUNT>.dkr.ecr.ap-southeast-2.amazonaws.com/threat-intel-board:latest",
       "portMappings": [{ "containerPort": 3000, "protocol": "tcp" }],
       "healthCheck": {
-        "command": ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"],
+        "command": [
+          "CMD-SHELL",
+          "wget -qO- http://localhost:3000/api/health || exit 1"
+        ],
         "interval": 30,
         "timeout": 5,
         "retries": 3,
@@ -95,6 +99,7 @@ aws ecs register-task-definition --cli-input-json file://task-def.json --region 
 > **IAM note:** The `ecsTaskExecutionRole` needs the managed policy
 > `AmazonECSTaskExecutionRolePolicy` (allows pulling from ECR and writing to
 > CloudWatch Logs). Create it once if it doesn't exist:
+>
 > ```bash
 > aws iam create-role --role-name ecsTaskExecutionRole \
 >   --assume-role-policy-document '{"Version":"2012-10-17","Statement":[{"Effect":"Allow","Principal":{"Service":"ecs-tasks.amazonaws.com"},"Action":"sts:AssumeRole"}]}'
@@ -151,14 +156,14 @@ WEBHOOK_URL=https://<ecs-url>/api/tickets npx cdk deploy
 
 ## API
 
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/health` | Health check |
-| GET | `/api/teams` | List all teams with ticket counts |
-| GET | `/api/tickets?team=<id>` | List tickets (optionally filtered by team) |
-| GET | `/api/ticket/:id` | Get single ticket |
-| POST | `/api/tickets` | Ingest new ticket from pipeline |
-| POST | `/api/update-ticket/:id` | Update status/severity/add comment |
+| Method | Path                     | Description                                |
+| ------ | ------------------------ | ------------------------------------------ |
+| GET    | `/api/health`            | Health check                               |
+| GET    | `/api/teams`             | List all teams with ticket counts          |
+| GET    | `/api/tickets?team=<id>` | List tickets (optionally filtered by team) |
+| GET    | `/api/ticket/:id`        | Get single ticket                          |
+| POST   | `/api/tickets`           | Ingest new ticket from pipeline            |
+| POST   | `/api/update-ticket/:id` | Update status/severity/add comment         |
 
 ### POST `/api/tickets` payload
 
@@ -184,7 +189,11 @@ Unknown `asset_category` values are routed to the **Service Desk** team.
 ### POST `/api/update-ticket/:id` payload
 
 ```json
-{ "status": "in_progress", "severity": "medium", "comment": "De-escalated after review." }
+{
+  "status": "in_progress",
+  "severity": "medium",
+  "comment": "De-escalated after review."
+}
 ```
 
 All fields optional.
