@@ -1,7 +1,9 @@
 # Threat Intel Board — Mock Frontend
 
-Jira-like ticket board for the Threat Intelligence Classification & Routing pipeline.
-Receives threat digests from the AWS pipeline, displays them by team, and lets analysts review/update tickets.
+
+
+This is a mockup Jira-like ticket board for the [AWS Agents](https://github.com/Brianmitchtay/aws-agents) Threat Intelligence Classification & Routing pipeline hackathon entry.
+Receives threat digests from the AWS pipeline, displays them by team, and lets analysts review/update tickets. It's built to be hosted on AWS as an ECS app.
 
 ## Run locally
 
